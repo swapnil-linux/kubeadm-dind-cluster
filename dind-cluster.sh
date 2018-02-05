@@ -915,6 +915,7 @@ function dind::up {
     # FIXME: check for taint & retry if it's there
     "${kubectl}" taint nodes kube-master node-role.kubernetes.io/master- || true
   fi
+  dind::fix-mounts
   case "${CNI_PLUGIN}" in
     bridge)
       ;;
@@ -953,7 +954,8 @@ function dind::fix-mounts {
     if ((n > 0)); then
       node_name="kube-node-${n}"
     fi
-    docker exec "${node_name}" mount /run -o remount,rshared
+    docker exec "${node_name}" mount --make-shared /lib/modules/
+    docker exec "${node_name}" mount --make-shared /run
   done
 }
 
@@ -1008,6 +1010,7 @@ function dind::restore {
   for pid in ${pids[*]}; do
     wait ${pid}
   done
+  dind::fix-mounts
   # Recheck kubectl config. It's possible that the cluster was started
   # on this docker from different host
   dind::configure-kubectl
@@ -1249,7 +1252,6 @@ case "${1:-}" in
     else
       dind::restore
     fi
-    dind::fix-mounts
     ;;
   reup)
     dind::prepare-sys-mounts
@@ -1264,7 +1266,6 @@ case "${1:-}" in
       restore_cmd=update_and_restore
       dind::restore
     fi
-    dind::fix-mounts
     ;;
   down)
     dind::down
@@ -1292,7 +1293,6 @@ case "${1:-}" in
   restore)
     shift
     dind::restore
-    dind::fix-mounts
     ;;
   clean)
     dind::clean
